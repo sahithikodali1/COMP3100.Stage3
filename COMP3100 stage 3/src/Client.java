@@ -1,15 +1,23 @@
-import java.net.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.io.*;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.DocumentBuilder;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import org.w3c.dom.Element;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 public class Client {
+
 	private Socket socket;
 	private OutputStream outToServer;
 	private DataOutputStream out;
@@ -23,6 +31,7 @@ public class Client {
 	private static final String NONE = "NONE";
 	private static final String ERR = "ERR: No such waiting job exists";
 	private static final String RESC = "RESC Avail";
+	private static final String RESCCapable = "RESC Capable";
 	private static final String OK = "OK";
 	private static final String ERR2 = "ERR: invalid command (OK)";
 	
@@ -42,7 +51,6 @@ public class Client {
 			writeMSG(socket, AUTH);
 			
 			//parse system.xml
-			
 			File file = new File("system.xml");
 			String ans = parse(file);
 			System.out.println(ans);
@@ -56,7 +64,10 @@ public class Client {
 			//third message from server
 			//readMSG(socket);
 			
-			int i = 0;
+			/**
+			 * method for going through the servers
+			 * and picking the right server for each job
+			 */
 			while(true) {
 				//reading job from server
 				String error = readMSG(socket);
@@ -64,7 +75,7 @@ public class Client {
 					break;
 				}
 				
-				//sending resc command for specific job
+				//finding correct RESC command for specific job
 				int spaces = 0;
 				int index = 0;
 				for(int temp = 0; temp < error.length(); temp++) {
@@ -76,20 +87,84 @@ public class Client {
 						break;
 					}
 				}
+				
+				//sending RESC command
 				String job = error.substring(index);
 				writeMSG(socket, RESC + job);
 				
-				String servers = readMSG(socket);
+				String servers = readMSG(socket);//sends back DATA
+				
+				writeMSG(socket,OK);//sends OK
+				
+				servers = readMSG(socket);//first server info
+			
+				String foundServer = null;
+				
+				//Initialize altfit and worstfit to MIN value
+				double worstFit = Double.MAX_VALUE;
+				double altFit = Double.MAX_VALUE;
+				
+				//Servers to store the worst and altfit servers
+				String wf_server = null;
+				String af_server = null;
+				
+				
 				//writing OK while receiving info on servers,
 				//also checks if all info has been sent
 				while(!servers.substring(0, 1).contains(".")) {
+				
+					double fitness_val = 0;
+					fitness_val= Fitness_val(servers, error);
+					
+					String serverState = getNumb(servers,2);
+					
+					
+					//check the fitness value and if server is immediately available
+					if((fitness_val < worstFit) && (Integer.parseInt(serverState) == 2 ||Integer.parseInt(serverState) == 3))
+					{
+						worstFit = fitness_val;
+						wf_server = servers;
+					}
+						
+					else if((fitness_val < altFit)&& (Integer.parseInt(serverState) != 2 ||Integer.parseInt(serverState) != 3))
+					{
+						altFit = fitness_val;
+						af_server = servers;
+							
+					}
+					
 					writeMSG(socket,OK);
-					servers = readMSG(socket);
+					servers = readMSG(socket); //going through the servers
+					
+					
+				}
+				
+				String jobN = getNumb(error, 2);
+				
+				//If worst fit server is found assign the job 
+				if(wf_server != null) {
+					String servernum = getNumb(wf_server,1);
+					foundServer = getNumb(wf_server,0);
+					writeMSG(socket,"SCHD " + jobN + " " + foundServer + " " +servernum);
+				}
+				
+				//If alt fit server is found assign the job 
+				else if(af_server != null) {
+					String servernum = getNumb(af_server,1);
+					foundServer = getNumb(af_server,0);
+					writeMSG(socket,"SCHD " + jobN + " " + foundServer + " " +servernum);
+				}
+				
+				
+				//else assign jobs based on large capacity
+				else {
+					
+					writeMSG(socket,"SCHD " + jobN + " " + ans + " " + "0");
+	
 				}
 
-				//job message to server
-				writeMSG(socket,"SCHD " + i + " " + ans + " 0");
-				
+
+					
 				//get response
 				String response = readMSG(socket);
 				if(response.contains(NONE) || response.contains(ERR)) {
@@ -98,7 +173,7 @@ public class Client {
 				
 				//send REDY
 				writeMSG(socket, REDY);
-				i++;
+		
 			}
 			
 			//LAST STAGE: QUIT
@@ -135,7 +210,7 @@ public class Client {
 		out = new DataOutputStream(outToServer);
 		
 		out.write(msg.getBytes());
-		//System.out.println("messge sent to server: " + msg);
+		System.out.println("messge sent to server: " + msg);
 		out.flush();
 	}
 	/*
@@ -151,7 +226,7 @@ public class Client {
 		in.read(rMSG);
 		
 		String str = new String(rMSG);
-		//System.out.println("message received from server: "  + str);
+		System.out.println("message received from server: "  + str);
 		return str;
 	}
 	
@@ -184,16 +259,16 @@ public class Client {
 				}
 			}
 			
-			int smallest = Integer.MAX_VALUE;
+			int largest = 0;
 			
 			for(int i = 1; i<str.size(); i++) {
-				if(list.get(i) < list.get(smallest)) {
-					smallest  = i;
+				if(list.get(i) > list.get(largest)) {
+					largest  = i;
 				}
 			}
 			
 			String ans = new String();
-			ans =  str.get(smallest);
+			ans =  str.get(largest);
 			
 			return ans;
 			
@@ -202,6 +277,76 @@ public class Client {
 		}
 		
 		return "Did not work";
+	}
+		
+	
+	/**
+	 * Calculate the fitness value
+	 * 
+	 */
+	public static int Fitness_val(String address, String job) {
+		String server_avtime = getNumb(address, 3);
+		String job_runtime = getNumb(job,1);
+		
+		int fv = 0;
+		fv = Integer.parseInt(server_avtime) - Integer.parseInt(job_runtime);
+		
+		return fv;
+	}
+	
+	
+
+	
+	/**
+	 * Finds the number after a certain space
+	 * from both the job and the server information
+	 * memory info is held after space 5
+	 * diskspace info is held after space 6
+	 */
+	public static String getNumb(String address, int spaces) {
+		int spc = 0;
+		int subindex = 0;
+		String numb = null;
+		
+		if(address.length() < 5) {
+			System.out.println("address is too short at: " + address.length());
+			return null;
+		}
+		
+		for(int temp = 0; temp < address.length(); temp++) {
+			if(address.charAt(temp) == ' ') {
+				spc++;
+			}
+			if(spc == spaces) {
+				subindex = temp;
+				break;
+			}
+		}
+		System.out.println(spc + " subindex is: " + subindex);
+		System.out.println(address);
+		
+		
+		int finalIndex = subindex +1;
+		if(spaces <= 5) {
+			while(address.charAt(finalIndex) != ' ') {
+				finalIndex++;
+			}
+		} else {
+			finalIndex = address.length();
+		}
+		
+		
+		System.out.println("finalindex is: " + finalIndex);
+		if(spaces != 0) {
+			numb = address.substring(subindex+1,finalIndex);
+		} else {
+			numb = address.substring(subindex,finalIndex);
+		}
+		
+		
+		System.out.println("string returned " + numb);
+		
+		return numb;
 	}
 	
 	/*
