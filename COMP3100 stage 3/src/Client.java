@@ -101,8 +101,8 @@ public class Client {
 				String foundServer = null;
 				
 				//Initialize altfit and worstfit to MIN value
-				double worstFit = Double.MAX_VALUE;
-				double altFit = Double.MAX_VALUE;
+				double worstFit = Double.MIN_VALUE;
+				double altFit = Double.MIN_VALUE;
 				
 				//Servers to store the worst and altfit servers
 				String wf_server = null;
@@ -120,18 +120,12 @@ public class Client {
 					
 					
 					//check the fitness value and if server is immediately available
-					if((fitness_val < worstFit) && (Integer.parseInt(serverState) == 2 ||Integer.parseInt(serverState) == 3))
+					if((fitness_val > worstFit)) //&& (Integer.parseInt(serverState) == 2 ||Integer.parseInt(serverState) == 3))
 					{
 						worstFit = fitness_val;
 						wf_server = servers;
 					}
 						
-					else if((fitness_val < altFit)&& (Integer.parseInt(serverState) != 2 ||Integer.parseInt(serverState) != 3))
-					{
-						altFit = fitness_val;
-						af_server = servers;
-							
-					}
 					
 					writeMSG(socket,OK);
 					servers = readMSG(socket); //going through the servers
@@ -145,13 +139,6 @@ public class Client {
 				if(wf_server != null) {
 					String servernum = getNumb(wf_server,1);
 					foundServer = getNumb(wf_server,0);
-					writeMSG(socket,"SCHD " + jobN + " " + foundServer + " " +servernum);
-				}
-				
-				//If alt fit server is found assign the job 
-				else if(af_server != null) {
-					String servernum = getNumb(af_server,1);
-					foundServer = getNumb(af_server,0);
 					writeMSG(socket,"SCHD " + jobN + " " + foundServer + " " +servernum);
 				}
 				
