@@ -24,6 +24,7 @@ public class Client {
 	private InputStream inFromServer;
 	private DataInputStream in;
 	
+	static int algorithm = 0;
 	private static final String HELO =  "HELO";
 	private static final String AUTH =  "AUTH comp335";
 	private static final String QUIT = "QUIT";
@@ -100,13 +101,11 @@ public class Client {
 			
 				String foundServer = null;
 				
-				//Initialize altfit and worstfit to MIN value
-				double worstFit = Double.MIN_VALUE;
-				double altFit = Double.MIN_VALUE;
+				//Initialize wait time to MIN value
+				double high_wttime = Double.MIN_VALUE;
 				
-				//Servers to store the worst and altfit servers
-				String wf_server = null;
-				String af_server = null;
+				//Servers to store the highest wait time server
+				String wt_server = null;
 				
 				
 				//writing OK while receiving info on servers,
@@ -119,11 +118,11 @@ public class Client {
 					String serverState = getNumb(servers,2);
 					
 					
-					//check the fitness value and if server is immediately available
-					if((fitness_val > worstFit)) //&& (Integer.parseInt(serverState) == 2 ||Integer.parseInt(serverState) == 3))
+					//check the fitness value
+					if((fitness_val > high_wttime))
 					{
-						worstFit = fitness_val;
-						wf_server = servers;
+						high_wttime = fitness_val;
+						wt_server = servers;
 					}
 						
 					
@@ -135,10 +134,10 @@ public class Client {
 				
 				String jobN = getNumb(error, 2);
 				
-				//If worst fit server is found assign the job 
-				if(wf_server != null) {
-					String servernum = getNumb(wf_server,1);
-					foundServer = getNumb(wf_server,0);
+				//If highest waiting time server is found assign the job 
+				if(wt_server != null) {
+					String servernum = getNumb(wt_server,1);
+					foundServer = getNumb(wt_server,0);
 					writeMSG(socket,"SCHD " + jobN + " " + foundServer + " " +servernum);
 				}
 				
@@ -268,7 +267,8 @@ public class Client {
 		
 	
 	/**
-	 * Calculate the fitness value
+	 * Calculate the fitness value i.e 
+	 * wait time = server available time - Job submit time 
 	 * 
 	 */
 	public static int Fitness_val(String address, String job) {
@@ -341,6 +341,15 @@ public class Client {
 	 */
 	public static void main(String[] args) {
 		Client client = new Client("127.0.0.1", 50000);
+
+		for(int i=0; i < args.length; i++) 
+		{
+			if(args[i].equals("-a"))
+			{
+				if(args[i+1].contentEquals("mwt"))
+					algorithm = 1;
+			}
+		}
 	}
 
 }
