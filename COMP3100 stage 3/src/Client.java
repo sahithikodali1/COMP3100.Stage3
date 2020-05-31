@@ -346,7 +346,7 @@ public class Client {
 		{
 			if(args[i].equals("-a"))
 			{
-				if(args[i+1].contentEquals("mwt"))
+				if(args[i+1].contentEquals("high_waittime"))
 					algorithm = 1;
 			}
 		}
